@@ -244,41 +244,63 @@ ISR(RFM12_INT_VECT) {
 	// and also help in determining if the data is any good
 	InterruptStatus = Rfm12bSpi.GetWord (RFM12B_STATUS_CMD);
 	
-    if (0 == OutputLength) {
-		// nothing in transmit buffer, so must be in receive mode
+    if ((InterruptStatus & GOOD_BIT_SYNC) == GOOD_BIT_SYNC) {
+        // good bit sync, so start or continue receiving packet
+        // good bit sync should not be possible while txing
 		// read FIFO to get the data and reset the interrupt
 	    unsigned char DataByte = Rfm12bSpi.GetWordSlow (RFM12B_READ_CMD);
 		DEBUG_RX_DATA;    // dump info if debug enabled
-		if (((InterruptStatus & GOOD_BIT_SYNC) != GOOD_BIT_SYNC) ||
-		    ((InputLength == 0) && (DataByte > MAX_PACKET_SIZE))) {
-			// poor signal quality or not a legitimate packet length
+		if ((InputLength == 0) && (DataByte > MAX_PACKET_SIZE)) {
+			// not a legitimate packet length
 			// so throw away the data and reset the FIFO
 			ResetFifo();
-			return;
+            // fall thru to check for waiting tx packet
 			}
-		// seems to be a strong signal so run the data thru the crc and save it
-		Crc = _crc16_update(Crc, DataByte);
-	    InputData[InputLength] = DataByte;
-		if (InputData[0] == InputLength++) {
-			// all expected bytes in packet completely received
-			// so check for a good crc
-			if (Crc == 0) {
-				// crc is good, so indicate that a packet is ready				
-				InputLength -= 2;    // drop the two crc bytes from the packet
-				InputLength *= -1;   // make the length negative to indicate packet is ready
-				}
-			else {
-				// crc is bad
-				DEBUG_CRC;         // dump info if debug enabled
-				InputLength = 0;   // bad packet crc, so discard
-				}
-			// reset FIFO to start search for sync
-			ResetFifo();
-			}
-		}
-	else if (OutputIndex <= OutputLength) 
+        else {
+		    // seems to be good data so run it thru the crc and save it
+		    Crc = _crc16_update(Crc, DataByte);
+	        InputData[InputLength] = DataByte;
+		    if (InputData[0] == InputLength++) {
+			    // all expected bytes in packet completely received
+			    // so check for a good crc
+			    if (Crc == 0) {
+				    // crc is good, so indicate that a packet is ready				
+				    InputLength -= 2;    // drop the two crc bytes from the packet
+				    InputLength *= -1;   // make the length negative to indicate packet is ready
+				    }
+			    else {
+				    // crc is bad
+				    DEBUG_CRC;         // dump info if debug enabled
+				    InputLength = 0;   // bad packet crc, so discard
+				    }
+			    // reset FIFO to start search for sync
+			    ResetFifo();
+			    }  // packet completely received
+            else
+                // still expecting to receive more data so the ISR is done
+                return;
+            }  // good data received      
+		}  // good bit sync
+    else if (InputLength > 0) {
+        // bad bit sync, reset FIFO if already started receiving a packet
+		ResetFifo();
+        InputLength = 0; 
+        }  
+    if (OutputLength == 0)
+        // nothing to transmit so IRS is done
+        return;
+	if (OutputIndex <= OutputLength) 
 		// in transmit mode with more data to send
 		Rfm12bSpi.SendWord (RFM12B_TX_CMD + OutputData[OutputIndex++]);
+    else if (OutputLength < 0) {
+        // waiting to start txing packet
+        if ((InterruptStatus & RFM12B_STATUS_RSSI_PIN) == RFM12B_STATUS_RSSI_PIN) {
+            // signal detected so set watchdog to wakeup and look again
+            }
+        else {
+            // all clear so start txing
+            }
+        }        
 	else {
 		// completed a packet transmission, so switch to receive mode
 		OutputIndex = OutputLength = OutputData[0] = 0;
