@@ -150,8 +150,17 @@ volatile uint16_t Crc;
 #endif
 
 
-Rfm12b::Rfm12b () {	
+Rfm12b::Rfm12b () {
+	// initialize pins for HW SPI interface
+	//InitPin (&SlaveSelect, PORT_B, PIN_2, OUTPUT_MODE, LOW);
+	//InitPin (&Mosi, PORT_B, PIN_3, OUTPUT_MODE, HIGH);
+	//InitPin (&Miso, PORT_B, PIN_4, INPUT_MODE, HIGH);
+	//InitPin (&Clk, PORT_B, PIN_5, OUTPUT_MODE, HIGH);
+	// initialize HW SPI interface
+	//Rfm12bSpi.Initialize (SLAVE_SELECT, MOSI, MISO, CLK);
+	
 	// initialize pin for RFM12B interrupt
+	//InitPin (&Irq, PORT_D, PIN_2, INPUT_MODE, LOW);
 	InitPinInActive (IRQ);  // input, active low, enable pull-up
     }
 
@@ -171,6 +180,7 @@ void Rfm12b::Initialize () {
 	Rfm12bSpi.SendWord (RFM12B_WAKEUP_CMD);              // Wake-Up Timer not used
 	Rfm12bSpi.SendWord (RFM12B_DUTYCYCLE_CMD);           // Low Duty-Cycle not used
 
+	//memset ((void*) InputData, 0, 10);
 	OutputIndex = OutputLength = InputLength = 0;
 	Crc = ~0;
 	DEBUG_INIT;
