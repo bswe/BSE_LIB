@@ -150,6 +150,36 @@ volatile uint16_t Crc;
 #endif
 
 
+void StartTx (uint16_t Status) {
+    RFM12_INT_OFF();
+    if ((InputLength > 0) ||
+    ((Status & RFM12B_STATUS_RSSI_PIN) == RFM12B_STATUS_RSSI_PIN)) {
+        // already receiving or signal detected, so set RFM12B to wakeup and look again
+        Rfm12bSpi.SendWord (RFM12B_WAKEUP_CMD | 0x10);   // Wake-Up Timer set to 16 msec
+        // toggle ew (enable wakeup timer) bit to arm the timer to fire
+        Rfm12bSpi.SendWord (RF_RECEIVER_ON);
+        Rfm12bSpi.SendWord (RF_RECEIVER_ON | RFM12B_PWRMGT_EW_PIN);
+    }
+    else {
+        // all clear so start txing
+        Rfm12bSpi.SendWord (RF_IDLE_MODE);      // switch off receiver
+        // pre-load preamble byte into transmit buffer to get things going quickly
+        Rfm12bSpi.SendWord (RFM12B_TX_CMD + PREAMBLE);
+        // turn on transmitter
+        Rfm12bSpi.SendWord (RF_XMITTER_ON); // bytes will be fed via interrupts
+    }
+    RFM12_INT_ON();
+}
+
+
+void ResetFifo () {
+    // reset the receiver fifo
+    Rfm12bSpi.SendWord (FIFO_FILL_STOP);
+    Rfm12bSpi.SendWord (FIFO_FILL_START);
+    Crc = ~0;
+}
+
+
 Rfm12b::Rfm12b () {	
 	// initialize pin for RFM12B interrupt
 	InitPinInActive (IRQ);  // input, active low, enable pull-up
@@ -185,16 +215,10 @@ void Rfm12b::Initialize () {
 uint8_t Rfm12b::Send (uint8_t* Data, uint8_t Length) {
 	uint8_t i;
 	
-	RFM12_INT_OFF();
-	if ((InputLength > 0) ||
-        (Rfm12bSpi.GetWord (RFM12B_STATUS_CMD) & RFM12B_STATUS_RSSI_PIN) != 0) {
-        // either already receiving something or RFM12B detects a 
-        // signal, so don't send now
-	    RFM12_INT_ON();
-	    return 0;
-        }        
-	Rfm12bSpi.SendWord (RF_IDLE_MODE);      // switch off receiver
-	OutputData[LENGTH_BYTE] = Length + 2;   // include 2 crc bytes in length
+	if (OutputLength != 0)
+        // output buffer is not empty, so indicate failure to queue packet
+        return 0;
+    OutputData[LENGTH_BYTE] = Length + 2;   // include 2 crc bytes in length
     memcpy ((void*) &OutputData[LENGTH_BYTE+1], Data, Length);
 	OutputLength = Length + LENGTH_BYTE + 1;    // include 4 preamble bytes + 1 Length byte
     // calculate crc and put it into output buffer
@@ -205,11 +229,7 @@ uint8_t Rfm12b::Send (uint8_t* Data, uint8_t Length) {
 	OutputData[OutputLength++] = Crc >> 8;
     // add trailer byte to end of packet to ensure last byte of data is transmitted completely
 	OutputData[OutputLength] = PREAMBLE;
-    // pre-load preamble byte into transmit buffer to get things going quickly
-	Rfm12bSpi.SendWord (RFM12B_TX_CMD + PREAMBLE);
-    // turn on transmitter
-    Rfm12bSpi.SendWord (RF_XMITTER_ON); // bytes will be fed via interrupts
-	RFM12_INT_ON();
+    StartTx (Rfm12bSpi.GetWord (RFM12B_STATUS_CMD));
     return Length;
 	}
 
@@ -229,14 +249,6 @@ uint8_t Rfm12b::Recv (uint8_t* Bfr) {
 	}
 
 
-void ResetFifo () {
-	// reset the receiver fifo
-	Rfm12bSpi.SendWord (FIFO_FILL_STOP);
-	Rfm12bSpi.SendWord (FIFO_FILL_START);
-	Crc = ~0;
-	}
-
-
 ISR(RFM12_INT_VECT) {
     DEBUG_STATUS;
 	
@@ -248,7 +260,7 @@ ISR(RFM12_INT_VECT) {
         // good bit sync, so start or continue receiving packet
         // good bit sync should not be possible while txing
 		// read FIFO to get the data and reset the interrupt
-	    unsigned char DataByte = Rfm12bSpi.GetWordSlow (RFM12B_READ_CMD);
+	    uint8_t DataByte = Rfm12bSpi.GetWordSlow (RFM12B_READ_CMD);
 		DEBUG_RX_DATA;    // dump info if debug enabled
 		if ((InputLength == 0) && (DataByte > MAX_PACKET_SIZE)) {
 			// not a legitimate packet length
@@ -293,13 +305,8 @@ ISR(RFM12_INT_VECT) {
 		// in transmit mode with more data to send
 		Rfm12bSpi.SendWord (RFM12B_TX_CMD + OutputData[OutputIndex++]);
     else if (OutputLength < 0) {
-        // waiting to start txing packet
-        if ((InterruptStatus & RFM12B_STATUS_RSSI_PIN) == RFM12B_STATUS_RSSI_PIN) {
-            // signal detected so set watchdog to wakeup and look again
-            }
-        else {
-            // all clear so start txing
-            }
+        // wakeup timer interrupt, so must be waiting to start txing packet
+        StartTx (InterruptStatus);
         }        
 	else {
 		// completed a packet transmission, so switch to receive mode
