@@ -94,16 +94,18 @@ volatile uint16_t Crc;
 					      Rfm12bStatus[InterruptCount-1].BadCrc = Crc;
 	#define DEBUG_RX_DATA if (InterruptCount <= STATUS_SIZE) \
 						      Rfm12bStatus[InterruptCount-1].InputData = DataByte;
+    #define USED_WAKEUP UsedWakeup = TRUE;
 
 	#define STATUS_SIZE 20
 
 	typedef struct Status {
 		uint16_t InterruptStatus, BadCrc;
-		uint8_t OutputLength, OutputIndex, OutputData, InputLength, InputData;
+		uint8_t OutputLength, OutputIndex, OutputData, InputLength, InputData, UsedWakeup;
 	} Status;
 
 	volatile Status Rfm12bStatus[STATUS_SIZE];
 	volatile uint32_t InterruptCount = 0;
+    uint8_t UsedWakeup = 0;
 
 	extern uint8_t StrBfr[50];
 
@@ -122,10 +124,12 @@ volatile uint16_t Crc;
 				SendStringAndInt (UI8_P("OB="), Rfm12bStatus[i].OutputData, UI8_P(",   "));
 				SendStringAndInt (UI8_P("IB="), Rfm12bStatus[i].InputData, UI8_P(",   "));
 				SendStringAndInt (UI8_P("IL="), Rfm12bStatus[i].InputLength, UI8_P(",   "));
-				SendStringAndInt (UI8_P("BC="), Rfm12bStatus[i].BadCrc, UI8_P("\r\n"));
+				SendStringAndInt (UI8_P("BC="), Rfm12bStatus[i].BadCrc, UI8_P(",   "));
+				SendStringAndInt (UI8_P("UW="), Rfm12bStatus[i].UsedWakeup, UI8_P("\r\n"));
 				i++;
 			}
 		SendString(UI8_P("}\r\n"));
+        DEBUG_INIT;
 		sei();
 	}
 
@@ -139,6 +143,8 @@ volatile uint16_t Crc;
 			Rfm12bStatus[InterruptCount].OutputIndex = OutputIndex;
 			Rfm12bStatus[InterruptCount].OutputData = OutputData[OutputIndex];
 			Rfm12bStatus[InterruptCount].BadCrc = 0;
+			Rfm12bStatus[InterruptCount].UsedWakeup = UsedWakeup;
+            UsedWakeup = 0;
 		}
 		InterruptCount++;
 	}
@@ -147,18 +153,20 @@ volatile uint16_t Crc;
 	#define DEBUG_STATUS
 	#define DEBUG_RX_DATA
 	#define DEBUG_CRC
+    #define USED_WAKEUP 
 #endif
 
 
 void StartTx (uint16_t Status) {
     RFM12_INT_OFF();
     if ((InputLength > 0) ||
-    ((Status & RFM12B_STATUS_RSSI_PIN) == RFM12B_STATUS_RSSI_PIN)) {
+        ((Status & RFM12B_STATUS_RSSI_PIN) == RFM12B_STATUS_RSSI_PIN)) {
         // already receiving or signal detected, so set RFM12B to wakeup and look again
         Rfm12bSpi.SendWord (RFM12B_WAKEUP_CMD | 0x10);   // Wake-Up Timer set to 16 msec
         // toggle ew (enable wakeup timer) bit to arm the timer to fire
         Rfm12bSpi.SendWord (RF_RECEIVER_ON);
         Rfm12bSpi.SendWord (RF_RECEIVER_ON | RFM12B_PWRMGT_EW_PIN);
+        USED_WAKEUP;
     }
     else {
         // all clear so start txing
@@ -298,9 +306,11 @@ ISR(RFM12_INT_VECT) {
 		ResetFifo();
         InputLength = 0; 
         }  
-    if (OutputLength == 0)
-        // nothing to transmit so IRS is done
+    else if (OutputLength == 0) {
+        // bad bit sync and in rx mode, so reset FIFO to look for next sync
+        ResetFifo();
         return;
+        }        
 	if (OutputIndex <= OutputLength) 
 		// in transmit mode with more data to send
 		Rfm12bSpi.SendWord (RFM12B_TX_CMD + OutputData[OutputIndex++]);
