@@ -19,22 +19,31 @@
  * Created: 8/19/13
  */
 
-#ifndef RFM12B_H_
-#define RFM12B_H_
+#ifndef WIRELESS_PACKET_H_
+#define WIRELESS_PACKET_H_
 
-#include "spi.h"
+#include "rfm12b.h"
 
-#define MAX_PHY_PACKET_PAYLOAD_SIZE 40 
-#define PHY_PACKET_CRC_SIZE 2    
-#define MAX_PHY_PACKET_SIZE MAX_PHY_PACKET_PAYLOAD_SIZE + PHY_PACKET_CRC_SIZE
+#define MAX_MAC_PACKET_SIZE  MAX_PHY_PACKET_PAYLOAD_SIZE
+#define MAX_MAC_HEADER_SIZE  5
+#define MAX_MAC_PAYLOAD_SIZE MAX_MAC_PACKET_SIZE - MAX_MAC_HEADER_SIZE
 
-class Rfm12b {
+#define PACKET_LENGTH_INDEX      0
+#define PACKET_TYPE_INDEX        1
+#define PACKET_DESTINATION_INDEX 2
+#define PACKET_SOURCE_INDEX      3
+#define PACKET_SEQUENCE_INDEX    4
+#define PACKET_PAYLOAD_INDEX     5
+
+
+#define MAC_REQUEST_PACKET_TYPE  0
+#define MAC_RESPONSE_PACKET_TYPE 1
+
+class Mac {
+    uint8_t SequenceNumber;
+    
     public:
-	    Rfm12b ();
-		void Initialize ();
-		uint8_t Send (uint8_t* Data);
-		uint8_t Recv (uint8_t* Bfr);
-		void DisplayStatus ();
-    };
- 
-#endif /* RFM12B_H_ */
+    Mac ();
+    uint8_t MakePacket (uint8_t* Packet, uint8_t Type, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length);
+};
+#endif /* WIRELESS_PACKET_H_ */

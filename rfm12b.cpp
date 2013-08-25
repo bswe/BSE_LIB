@@ -78,8 +78,8 @@
 
 Spi Rfm12bSpi;
 volatile uint16_t InterruptStatus;
-volatile uint8_t OutputData[MAX_PACKET_SIZE+4] = "\xAA\xAA\x2D\xD4";
-volatile uint8_t InputData[MAX_PACKET_SIZE];
+volatile uint8_t OutputData[MAX_PHY_PACKET_SIZE+4] = "\xAA\xAA\x2D\xD4";
+volatile uint8_t InputData[MAX_PHY_PACKET_SIZE];
 volatile uint8_t OutputIndex, OutputLength;
 volatile int8_t InputLength;
 volatile uint16_t Crc;
@@ -220,14 +220,15 @@ void Rfm12b::Initialize () {
     }
 
 
-uint8_t Rfm12b::Send (uint8_t* Data, uint8_t Length) {
-	uint8_t i;
+uint8_t Rfm12b::Send (uint8_t* Data) {
+	uint8_t i, Length;
 	
 	if (OutputLength != 0)
-        // output buffer is not empty, so indicate failure to queue packet
+        // output buffer is not empty, so indicate failure to queue the packet
         return 0;
+    Length = Data[0];
     OutputData[LENGTH_BYTE] = Length + 2;   // include 2 crc bytes in length
-    memcpy ((void*) &OutputData[LENGTH_BYTE+1], Data, Length);
+    memcpy ((void*) &OutputData[LENGTH_BYTE+1], &Data[1], Length);
 	OutputLength = Length + LENGTH_BYTE + 1;    // include 4 preamble bytes + 1 Length byte
     // calculate crc and put it into output buffer
 	Crc = ~0;
@@ -270,7 +271,7 @@ ISR(RFM12_INT_VECT) {
 		// read FIFO to get the data and reset the interrupt
 	    uint8_t DataByte = Rfm12bSpi.GetWordSlow (RFM12B_READ_CMD);
 		DEBUG_RX_DATA;    // dump info if debug enabled
-		if ((InputLength == 0) && (DataByte > MAX_PACKET_SIZE)) {
+		if ((InputLength == 0) && (DataByte > MAX_PHY_PACKET_SIZE)) {
 			// not a legitimate packet length
 			// so throw away the data and reset the FIFO
 			ResetFifo();

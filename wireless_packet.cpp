@@ -19,22 +19,20 @@
  * Created: 8/19/13
  */
 
-#ifndef RFM12B_H_
-#define RFM12B_H_
+#include <string.h>
+#include "wireless_packet.h"
 
-#include "spi.h"
+Mac::Mac () {
+    SequenceNumber = 0;
+    }
 
-#define MAX_PHY_PACKET_PAYLOAD_SIZE 40 
-#define PHY_PACKET_CRC_SIZE 2    
-#define MAX_PHY_PACKET_SIZE MAX_PHY_PACKET_PAYLOAD_SIZE + PHY_PACKET_CRC_SIZE
 
-class Rfm12b {
-    public:
-	    Rfm12b ();
-		void Initialize ();
-		uint8_t Send (uint8_t* Data);
-		uint8_t Recv (uint8_t* Bfr);
-		void DisplayStatus ();
-    };
- 
-#endif /* RFM12B_H_ */
+uint8_t Mac::MakePacket (uint8_t* Packet, uint8_t Type, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length) {
+    Packet[PACKET_LENGTH_INDEX] = Length + MAX_MAC_HEADER_SIZE - 1;  // don't include Length byte in packet length
+    Packet[PACKET_TYPE_INDEX] = Type;
+    Packet[PACKET_DESTINATION_INDEX] = Destination;
+    Packet[PACKET_SOURCE_INDEX] = Source;
+    Packet[PACKET_SEQUENCE_INDEX] = ++SequenceNumber;
+    memcpy ((void*) &Packet[PACKET_PAYLOAD_INDEX], Payload, Length);
+    return SequenceNumber;
+    }
