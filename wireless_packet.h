@@ -40,10 +40,11 @@
 #define MAC_RESPONSE_PACKET_TYPE 1
 
 class Mac {
-    uint8_t SequenceNumber;
+    uint8_t NextSequenceNumber;
     
     public:
     Mac ();
-    uint8_t MakePacket (uint8_t* Packet, uint8_t Type, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length);
+    uint8_t MakeRequestPacket (uint8_t* Packet, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length);
+    void MakeResponsePacket (uint8_t* Packet, uint8_t Destination, uint8_t Source, uint8_t SequenceNumber, uint8_t* Payload, uint8_t Length);
 };
 #endif /* WIRELESS_PACKET_H_ */

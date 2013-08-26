@@ -247,10 +247,9 @@ uint8_t Rfm12b::Recv (uint8_t* Bfr) {
 	uint8_t Length;
 	
 	if (InputLength < 0) {
-		// invert the length back to positive and drop the length byte from the overall length
-		Length = (InputLength * -1) - 1;    
-		// copy from index 1 to drop the length byte from the data
-		memcpy ((void*) Bfr, (void*) &InputData[1], Length);
+		// invert the length back to positive 
+		Length = InputLength * -1;    
+		memcpy ((void*) Bfr, (void*) InputData, Length);
 		InputLength = 0;
 		return Length;
 		}
@@ -285,9 +284,12 @@ ISR(RFM12_INT_VECT) {
 			    // all expected bytes in packet completely received
 			    // so check for a good crc
 			    if (Crc == 0) {
-				    // crc is good, so indicate that a packet is ready				
-				    InputLength -= 2;    // drop the two crc bytes from the packet
-				    InputLength *= -1;   // make the length negative to indicate packet is ready
+				    // crc is good, so indicate that a packet is ready	
+				    // drop the two crc bytes from the packet
+				    InputLength -= 2;    
+                    InputData[0] = InputLength;
+                    // make the length negative to indicate packet is ready
+				    InputLength *= -1;   
 				    }
 			    else {
 				    // crc is bad

@@ -23,16 +23,27 @@
 #include "wireless_packet.h"
 
 Mac::Mac () {
-    SequenceNumber = 0;
+    NextSequenceNumber = 0;
     }
 
 
-uint8_t Mac::MakePacket (uint8_t* Packet, uint8_t Type, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length) {
+uint8_t Mac::MakeRequestPacket (uint8_t* Packet, uint8_t Destination, uint8_t Source, uint8_t* Payload, uint8_t Length) {
     Packet[PACKET_LENGTH_INDEX] = Length + MAX_MAC_HEADER_SIZE - 1;  // don't include Length byte in packet length
-    Packet[PACKET_TYPE_INDEX] = Type;
+    Packet[PACKET_TYPE_INDEX] = MAC_REQUEST_PACKET_TYPE;
     Packet[PACKET_DESTINATION_INDEX] = Destination;
     Packet[PACKET_SOURCE_INDEX] = Source;
-    Packet[PACKET_SEQUENCE_INDEX] = ++SequenceNumber;
+    Packet[PACKET_SEQUENCE_INDEX] = NextSequenceNumber;
     memcpy ((void*) &Packet[PACKET_PAYLOAD_INDEX], Payload, Length);
-    return SequenceNumber;
+    return NextSequenceNumber++;
     }
+    
+
+void Mac::MakeResponsePacket (uint8_t* Packet, uint8_t Destination, uint8_t Source, uint8_t SequenceNumber, uint8_t* Payload, uint8_t Length) {
+    Packet[PACKET_LENGTH_INDEX] = Length + MAX_MAC_HEADER_SIZE - 1;  // don't include Length byte in packet length
+    Packet[PACKET_TYPE_INDEX] = MAC_RESPONSE_PACKET_TYPE;
+    Packet[PACKET_DESTINATION_INDEX] = Destination;
+    Packet[PACKET_SOURCE_INDEX] = Source;
+    Packet[PACKET_SEQUENCE_INDEX] = SequenceNumber;
+    memcpy ((void*) &Packet[PACKET_PAYLOAD_INDEX], Payload, Length);
+    }
+
