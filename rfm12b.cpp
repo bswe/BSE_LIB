@@ -61,16 +61,17 @@
 #define RF_IDLE_MODE    (RFM12B_PWRMGT_CMD | RFM12B_PWRMGT_DC_PIN)   // 8201h
 #define RF_RECEIVER_ON  (RFM12B_PWRMGT_CMD | RFM12B_PWRMGT_ER_PIN | RFM12B_PWRMGT_DC_PIN)   // 8281h
 #define RF_XMITTER_ON   (RFM12B_PWRMGT_CMD | RFM12B_PWRMGT_ET_PIN | RFM12B_PWRMGT_DC_PIN)   // 8221h
-#define FIFO_FILL_STOP  (RFM12B_FIFORESET_CMD | RFM12B_FIFORESET_LEVEL_8 | RFM12B_FIFORESET_DR_PIN)   // CA81h
+#define FIFO_FILL_STOP  (RFM12B_FIFORESET_CMD | RFM12B_FIFORESET_LEVEL_8 | RFM12B_FIFORESET_DR_PIN) // CA81h
 #define FIFO_FILL_START (FIFO_FILL_STOP | RFM12B_FIFORESET_FF_PIN)   // CA83h
-#define GOOD_BIT_SYNC   (RFM12B_STATUS_RSSI_PIN | RFM12B_STATUS_DQD_PIN | RFM12B_STATUS_CRL_PIN)   // 01C0h
-#define CONFIGURATION   (RFM12B_CFG_CMD | RFM12B_CFG_EL_PIN | RFM12B_CFG_EF_PIN | RFM12B_CFG_XTAL_12PF)   // 80C7h
+#define GOOD_BIT_SYNC   (RFM12B_STATUS_RSSI_PIN | RFM12B_STATUS_DQD_PIN | RFM12B_STATUS_CRL_PIN) // 01C0h
+#define CONFIGURATION   (RFM12B_CFG_CMD | RFM12B_CFG_EL_PIN | RFM12B_CFG_EF_PIN | RFM12B_CFG_XTAL_12PF)// 80C7h
 #define DATARATE        RFM12B_DATARATE_CALC_HIGH(49200.0)
-#define RX_CONFIG       (RFM12B_RXCTRL_CMD | RFM12B_RXCTRL_P16_PIN | RFM12B_RXCTRL_VDI_FAST | RFM12B_RXCTRL_BW_134 | \
-                         RFM12B_RXCTRL_LNA_0 | RFM12B_RXCTRL_RSSI_91)   // 94A2h
+#define RX_CONFIG       (RFM12B_RXCTRL_CMD | RFM12B_RXCTRL_P16_PIN | RFM12B_RXCTRL_VDI_FAST | \
+                         RFM12B_RXCTRL_BW_134 | RFM12B_RXCTRL_LNA_0 | RFM12B_RXCTRL_RSSI_91)   // 94A2h
 #define DATA_FILTER     (RFM12B_DATAFILTER_CMD | RFM12B_DATAFILTER_AL_PIN | 4)   // C2ACh
-#define FIFO_CONFIG     (RFM12B_FIFORESET_CMD | RFM12B_FIFORESET_LEVEL_8 | RFM12B_FIFORESET_FF_PIN | RFM12B_FIFORESET_DR_PIN)   // CA83h
-#define AFC_CONFIG      (RFM12B_AFC_CMD | RFM12B_AFC_AUTO_VDI | RFM12B_AFC_OE_PIN | RFM12B_AFC_EN_PIN)   // C483h
+#define FIFO_CONFIG     (RFM12B_FIFORESET_CMD | RFM12B_FIFORESET_LEVEL_8 | RFM12B_FIFORESET_FF_PIN | \
+                         RFM12B_FIFORESET_DR_PIN)   // CA83h
+#define AFC_CONFIG      (RFM12B_AFC_CMD | RFM12B_AFC_AUTO_VDI | RFM12B_AFC_OE_PIN | RFM12B_AFC_EN_PIN) // C483h
 #define TX_CONFIG       (RFM12B_TXCONF_CMD | RFM12B_TXCONF_FS_CALC(90000))   // 9850h 
 #define PLL_CONFIG      (RFM12B_PLL_CMD | 0x40 | RFM12B_PLL_DDIT_PIN | RFM12B_PLL_BW0_PIN)   // CC77h    
 
@@ -96,18 +97,29 @@ volatile uint16_t Crc;
 						      Rfm12bStatus[InterruptCount-1].InputData = DataByte;
     #define USED_WAKEUP UsedWakeup = TRUE;
 
-	#define STATUS_SIZE 20
+	#define STATUS_SIZE 60
 
 	typedef struct Status {
 		uint16_t InterruptStatus, BadCrc;
-		uint8_t OutputLength, OutputIndex, OutputData, InputLength, InputData, UsedWakeup;
-	} Status;
+		uint8_t OutputLength, 
+                OutputIndex, 
+                OutputData, 
+                InputLength, 
+                InputData, 
+                UsedWakeup;
+	    } Status;
 
 	volatile Status Rfm12bStatus[STATUS_SIZE];
 	volatile uint32_t InterruptCount = 0;
     uint8_t UsedWakeup = 0;
 
 	extern uint8_t StrBfr[50];
+    
+    void Rfm12b::ResetStatus () {
+        DEBUG_INIT;
+        InterruptCount = 0;
+        UsedWakeup = 0;
+        }
 
 	void Rfm12b::DisplayStatus () {
 		uint8_t i = 0;
@@ -116,7 +128,7 @@ volatile uint16_t Crc;
 		sprintf ((char*) StrBfr, "C=%ld {\r\n", InterruptCount);
 			SendString (StrBfr);
 			while ((i < STATUS_SIZE) && (Rfm12bStatus[i].OutputLength != 0xFF)) {
-				sprintf ((char*) StrBfr, "S=%0X,   ", Rfm12bStatus[i].InterruptStatus);
+				sprintf ((char*) StrBfr, "S=%04X,   ", Rfm12bStatus[i].InterruptStatus);
 				SendString (StrBfr);
 				SendStringAndInt (UI8_P("I#="), i, (uint8_t*) ",   ");
 				SendStringAndInt (UI8_P("OL="), Rfm12bStatus[i].OutputLength, UI8_P(",   "));
@@ -127,11 +139,11 @@ volatile uint16_t Crc;
 				SendStringAndInt (UI8_P("BC="), Rfm12bStatus[i].BadCrc, UI8_P(",   "));
 				SendStringAndInt (UI8_P("UW="), Rfm12bStatus[i].UsedWakeup, UI8_P("\r\n"));
 				i++;
-			}
+			    }
 		SendString(UI8_P("}\r\n"));
         DEBUG_INIT;
 		sei();
-	}
+	    }
 
 
 	void SaveStatus () {
@@ -145,9 +157,9 @@ volatile uint16_t Crc;
 			Rfm12bStatus[InterruptCount].BadCrc = 0;
 			Rfm12bStatus[InterruptCount].UsedWakeup = UsedWakeup;
             UsedWakeup = 0;
-		}
+		    }
 		InterruptCount++;
-	}
+	    }
 #else
 	#define DEBUG_INIT 
 	#define DEBUG_STATUS
@@ -167,17 +179,20 @@ void StartTx (uint16_t Status) {
         Rfm12bSpi.SendWord (RF_RECEIVER_ON);
         Rfm12bSpi.SendWord (RF_RECEIVER_ON | RFM12B_PWRMGT_EW_PIN);
         USED_WAKEUP;
-    }
+        }
     else {
         // all clear so start txing
+        // make OutputLength positive to indicate txing
+        OutputLength *= -1;
         Rfm12bSpi.SendWord (RF_IDLE_MODE);      // switch off receiver
+	    Rfm12bSpi.SendWord (RFM12B_WAKEUP_CMD); // clear Wake-Up Timer
         // pre-load preamble byte into transmit buffer to get things going quickly
         Rfm12bSpi.SendWord (RFM12B_TX_CMD + PREAMBLE);
         // turn on transmitter
         Rfm12bSpi.SendWord (RF_XMITTER_ON); // bytes will be fed via interrupts
-    }
+        }
     RFM12_INT_ON();
-}
+    }
 
 
 void ResetFifo () {
@@ -185,7 +200,7 @@ void ResetFifo () {
     Rfm12bSpi.SendWord (FIFO_FILL_STOP);
     Rfm12bSpi.SendWord (FIFO_FILL_START);
     Crc = ~0;
-}
+    }
 
 
 Rfm12b::Rfm12b () {	
@@ -194,11 +209,13 @@ Rfm12b::Rfm12b () {
     }
 
 
-void Rfm12b::Initialize () {	
-	Rfm12bSpi.SendWord (RFM12B_STATUS_CMD);              // initial SPI transfer added to avoid power-up problem?
+void Rfm12b::Initialize () {
+    // initial SPI transfer added to avoid power-up problem? 	
+	Rfm12bSpi.SendWord (RFM12B_STATUS_CMD);              
 	Rfm12bSpi.SendWord (RF_IDLE_MODE);                   // disable clk pin
 	Rfm12bSpi.SendWord (RFM12B_TX_CMD);                  // in case we're still in OOK mode
-	Rfm12bSpi.SendWord (CONFIGURATION | (BAND << 4));    // EL (enable TX), EF (enable RX FIFO), 12.0pF, 915 MHz
+	Rfm12bSpi.SendWord (CONFIGURATION | (BAND << 4));    // EL (enable TX), EF (enable RX FIFO), 
+	                                                     // 12.0pF, 915 MHz
 	Rfm12bSpi.SendWord (RFM12B_DATARATE_CMD | DATARATE); // approx 49.2 Kbps, i.e. 10000/29/(1+6) Kbps
 	Rfm12bSpi.SendWord (RX_CONFIG);                      // VDI, FAST, 134kHz, 0dBm, -91dBm
 	Rfm12bSpi.SendWord (DATA_FILTER);                    // AL, !ml, DIG, DQD=4
@@ -229,15 +246,19 @@ uint8_t Rfm12b::Send (uint8_t* Data) {
     Length = Data[0];
     OutputData[LENGTH_BYTE] = Length + 2;   // include 2 crc bytes in length
     memcpy ((void*) &OutputData[LENGTH_BYTE+1], &Data[1], Length);
-	OutputLength = Length + LENGTH_BYTE + 1;    // include 4 preamble bytes + 1 Length byte
+    // include 4 preamble bytes + 1 Length byte
+	OutputLength = Length + LENGTH_BYTE + 1;  
     // calculate crc and put it into output buffer
 	Crc = ~0;
 	for (i=0; i <= Length; i++)
 		Crc = _crc16_update(Crc, OutputData[i+4]);
 	OutputData[OutputLength++] = Crc & 0xFF;
 	OutputData[OutputLength++] = Crc >> 8;
-    // add trailer byte to end of packet to ensure last byte of data is transmitted completely
+    // add trailer byte to end of packet to ensure last byte of data is 
+    // transmitted completely
 	OutputData[OutputLength] = PREAMBLE;
+    // make OutputLength negative to indicate waiting for tx window
+    OutputLength *= -1;
     StartTx (Rfm12bSpi.GetWord (RFM12B_STATUS_CMD));
     return Length;
 	}
@@ -258,12 +279,12 @@ uint8_t Rfm12b::Recv (uint8_t* Bfr) {
 
 
 ISR(RFM12_INT_VECT) {
-    DEBUG_STATUS;
-	
 	// get the RFM12B status, this will help reset the interrupt
 	// and also help in determining if the data is any good
 	InterruptStatus = Rfm12bSpi.GetWord (RFM12B_STATUS_CMD);
 	
+    DEBUG_STATUS;
+    
     if ((InterruptStatus & GOOD_BIT_SYNC) == GOOD_BIT_SYNC) {
         // good bit sync, so start or continue receiving packet
         // good bit sync should not be possible while txing
@@ -298,6 +319,7 @@ ISR(RFM12_INT_VECT) {
 				    }
 			    // reset FIFO to start search for sync
 			    ResetFifo();
+                // fall thru to check for waiting tx packet
 			    }  // packet completely received
             else
                 // still expecting to receive more data so the ISR is done
@@ -309,8 +331,8 @@ ISR(RFM12_INT_VECT) {
 		ResetFifo();
         InputLength = 0; 
         }  
-    else if (OutputLength == 0) {
-        // bad bit sync and in rx mode, so reset FIFO to look for next sync
+    if (OutputLength == 0) {
+        // nothing to tx, so reset FIFO to look for next sync
         ResetFifo();
         return;
         }        
@@ -318,14 +340,15 @@ ISR(RFM12_INT_VECT) {
 		// in transmit mode with more data to send
 		Rfm12bSpi.SendWord (RFM12B_TX_CMD + OutputData[OutputIndex++]);
     else if (OutputLength < 0) {
-        // wakeup timer interrupt, so must be waiting to start txing packet
+        // must be waiting to start txing packet
         StartTx (InterruptStatus);
         }        
 	else {
 		// completed a packet transmission, so switch to receive mode
 		OutputIndex = OutputLength = OutputData[0] = 0;
-		Rfm12bSpi.SendWord (RF_RECEIVER_ON);
+	    Rfm12bSpi.SendWord (RF_IDLE_MODE);           // turn off tx
 		ResetFifo();
+		Rfm12bSpi.SendWord (RF_RECEIVER_ON);         // turn on rx
 		}
 	}
 

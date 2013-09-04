@@ -35,6 +35,7 @@ class Rfm12b {
 		uint8_t Send (uint8_t* Data);
 		uint8_t Recv (uint8_t* Bfr);
 		void DisplayStatus ();
+        void ResetStatus ();
     };
  
 #endif /* RFM12B_H_ */
