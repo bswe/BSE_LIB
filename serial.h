@@ -33,8 +33,10 @@ extern "C" {
 	void SerialInit (uint16_t Baudrate);
 	void SerialSend (uint8_t Char);
 	void SendString (uint8_t* str);
-	void SendInt (uint16_t d);
-	void SendStringAndInt (uint8_t* StartStr, uint16_t d, uint8_t* EndStr);
+	void SendUInt (uint16_t d);
+	void SendInt (int16_t d);
+	void SendStringAndUInt (uint8_t* StartStr, uint16_t d, uint8_t* EndStr);
+	void SendStringAndInt (uint8_t* StartStr, int16_t d, uint8_t* EndStr);
 	uint8_t ReadChar (void);
 
 #ifdef __cplusplus

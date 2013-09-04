@@ -52,18 +52,32 @@ void SendString (uint8_t* str) {
 	}
 
 
-void SendInt (uint16_t d) {
-	char str[10];
-	
-	sprintf (str,"%03u",d);
-	SendString ((uint8_t*)  str);
-	}
+void SendUInt (uint16_t d) {
+    char str[10];
+    
+    sprintf (str,"%03u",d);
+    SendString ((uint8_t*)  str);
+}
 
 
-void SendStringAndInt (uint8_t* StartStr, unsigned int d, uint8_t* EndStr) {
-	SendString (StartStr);
-	SendInt (d);
-	SendString (EndStr);
+void SendInt (int16_t d) {
+    char str[10];
+    
+    sprintf (str,"%03d",d);
+    SendString ((uint8_t*)  str);
+}
+
+
+void SendStringAndUInt (uint8_t* StartStr, uint16_t d, uint8_t* EndStr) {
+    SendString (StartStr);
+    SendUInt (d);
+    SendString (EndStr);
+}
+
+void SendStringAndInt (uint8_t* StartStr, int16_t d, uint8_t* EndStr) {
+    SendString (StartStr);
+    SendInt (d);
+    SendString (EndStr);
 }
 
 uint8_t ReadChar (void) {
